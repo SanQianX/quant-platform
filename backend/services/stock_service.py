@@ -1,4 +1,11 @@
 # 股票数据服务
+"""
+股票数据服务模块
+
+提供股票列表、搜索、K线数据等功能
+支持缓存和数据源适配
+"""
+
 import akshare as ak
 import pandas as pd
 from datetime import datetime, timedelta
@@ -6,6 +13,8 @@ from database import SessionLocal
 from models.stock import Stock, KLine
 from models.response import success_response, error_response
 from config import AKSHARE_CONFIG, MOCK_DATA_CONFIG, BASE_PRICES
+from utils.logger import logger
+from utils.cache import cache
 import re
 import random
 
@@ -34,6 +43,13 @@ class StockService:
         Returns:
             dict: 统一响应格式
         """
+        # 尝试从缓存获取
+        cache_key = "stock:list"
+        cached_data = cache.get(cache_key)
+        if cached_data is not None:
+            logger.info("从缓存获取股票列表")
+            return success_response(cached_data)
+        
         try:
             db = SessionLocal()
             stocks = db.query(Stock).all()
@@ -46,8 +62,14 @@ class StockService:
                 }
                 for s in stocks
             ]
+            
+            # 存入缓存
+            cache.set(cache_key, result, ttl=3600)
+            logger.info(f"获取股票列表成功，共{len(result)}条")
+            
             return success_response(result)
         except Exception as e:
+            logger.error(f"获取股票列表失败: {e}")
             return error_response(f"获取股票列表失败: {str(e)}")
         finally:
             db.close()
@@ -67,6 +89,8 @@ class StockService:
             if not keyword or len(keyword.strip()) == 0:
                 return error_response("搜索关键词不能为空")
             
+            logger.info(f"搜索股票: {keyword}")
+            
             db = SessionLocal()
             stocks = db.query(Stock).filter(
                 (Stock.name.like(f"%{keyword}%")) | 
@@ -82,8 +106,11 @@ class StockService:
                 }
                 for s in stocks
             ]
+            
+            logger.info(f"搜索'{keyword}'找到{len(result)}条结果")
             return success_response(result)
         except Exception as e:
+            logger.error(f"搜索失败: {e}")
             return error_response(f"搜索失败: {str(e)}")
         finally:
             db.close()
@@ -180,6 +207,15 @@ class StockService:
         if not is_valid:
             return error_response(error_msg)
         
+        # 尝试从缓存获取
+        cache_key = f"kline:{stock_code}"
+        cached_data = cache.get(cache_key)
+        if cached_data is not None:
+            logger.info(f"从缓存获取K线数据: {stock_code}")
+            return success_response(cached_data)
+        
+        logger.info(f"获取K线数据: {stock_code}")
+        
         db = SessionLocal()
         try:
             # 1. 先从数据库查询
@@ -243,16 +279,23 @@ class StockService:
                 })
             
             db.commit()
+            
+            # 存入缓存
+            cache.set(cache_key, kline_list, ttl=300)
+            logger.info(f"K线数据已缓存: {stock_code}")
+            
             return success_response(kline_list)
             
         except Exception as e:
             db.rollback()
             error_msg = f"获取K线数据失败: {str(e)}"
-            print(error_msg)
+            logger.error(error_msg)
             
             # 失败时尝试返回模拟数据
             if MOCK_DATA_CONFIG["enabled"]:
-                return success_response(StockService.get_mock_kline_data(stock_code))
+                mock_data = StockService.get_mock_kline_data(stock_code)
+                cache.set(cache_key, mock_data, ttl=60)
+                return success_response(mock_data)
             
             return error_response(error_msg)
         finally:
