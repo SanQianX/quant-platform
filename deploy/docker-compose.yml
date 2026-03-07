@@ -1,4 +1,5 @@
 # 量化数据平台 - Docker配置
+# 使用Windows路径格式
 
 services:
   # PostgreSQL数据库
@@ -21,28 +22,28 @@ services:
 
   # FastAPI后端
   backend:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
+    image: python:3.10-slim
     container_name: quant-backend
     ports:
       - "8000:8000"
+    working_dir: /app
     environment:
       - DATABASE_URL=postgresql://quant_user:quant_pass@postgres:5432/quant_platform
     depends_on:
       postgres:
         condition: service_healthy
     volumes:
-      - ./backend:/app
+      - //f/quant-platform/backend:/app
+    command: sh -c "pip install -r requirements.txt && uvicorn main:app --host 0.0.0.0 --port 8000"
 
-  # Vue3前端
+  # Vue3前端 (使用nginx服务)
   frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
+    image: nginx:alpine
     container_name: quant-frontend
     ports:
       - "3000:80"
+    volumes:
+      - //f/quant-platform/frontend:/usr/share/nginx/html:ro
     depends_on:
       - backend
 
