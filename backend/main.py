@@ -18,6 +18,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from api.stock import router as stock_router
+from api.stock_extra import router as stock_extra_router
 from config import API_CONFIG, ENV
 import init_data
 
@@ -39,6 +40,7 @@ app.add_middleware(
 
 # 注册路由
 app.include_router(stock_router)
+app.include_router(stock_extra_router)
 
 # 启动事件
 @app.on_event("startup")
