@@ -1,0 +1,50 @@
+# 量化数据平台 - Docker配置
+
+services:
+  # PostgreSQL数据库
+  postgres:
+    image: postgres:15-alpine
+    container_name: quant-db
+    environment:
+      POSTGRES_USER: quant_user
+      POSTGRES_PASSWORD: quant_pass
+      POSTGRES_DB: quant_platform
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U quant_user"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # FastAPI后端
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: quant-backend
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql://quant_user:quant_pass@postgres:5432/quant_platform
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./backend:/app
+
+  # Vue3前端
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: quant-frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+
+volumes:
+  postgres_data:
