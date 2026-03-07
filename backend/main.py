@@ -20,6 +20,7 @@ from fastapi.responses import JSONResponse
 from api.stock import router as stock_router
 from api.stock_extra import router as stock_extra_router
 from api.health import router as health_router
+from middleware.request_log import log_requests
 from config import API_CONFIG, ENV
 import init_data
 
@@ -38,6 +39,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# 添加请求日志中间件
+app.middleware("http")(log_requests)
 
 # 注册路由
 app.include_router(stock_router)
