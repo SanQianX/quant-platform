@@ -20,6 +20,7 @@ from fastapi.responses import JSONResponse
 from api.stock import router as stock_router
 from api.stock_extra import router as stock_extra_router
 from api.health import router as health_router
+from api.version import v1_router
 from middleware.request_log import log_requests
 from config import API_CONFIG, ENV
 import init_data
@@ -47,6 +48,7 @@ app.middleware("http")(log_requests)
 app.include_router(stock_router)
 app.include_router(stock_extra_router)
 app.include_router(health_router)
+app.include_router(v1_router)
 
 # 启动事件
 @app.on_event("startup")
