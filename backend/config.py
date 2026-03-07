@@ -1,5 +1,11 @@
 # 配置常量
+"""
+配置常量模块
+包含所有可配置的参数
+"""
+
 import os
+import re
 
 # 环境配置
 ENV = os.getenv("ENV", "development")
@@ -60,7 +66,21 @@ STOCK_LIST = [
 ]
 
 # 股票代码验证正则
-STOCK_CODE_REGEX = r"^\d{6}(_sh)?$"
+STOCK_CODE_REGEX = re.compile(r"^\d{6}(_sh)?$")
+
+# 性能配置
+PERFORMANCE_CONFIG = {
+    "cache_enabled": True,
+    "cache_ttl": 300,  # 缓存5分钟
+    "max_results": 500,  # 最大返回结果数
+    "request_timeout": 30,  # 请求超时秒数
+}
+
+# 分页配置
+PAGINATION_CONFIG = {
+    "default_page_size": 100,
+    "max_page_size": 1000,
+}
 
 # 基础价格映射（模拟数据用）
 BASE_PRICES = {

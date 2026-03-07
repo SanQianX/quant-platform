@@ -12,10 +12,9 @@ from datetime import datetime, timedelta
 from database import SessionLocal
 from models.stock import Stock, KLine
 from models.response import success_response, error_response
-from config import AKSHARE_CONFIG, MOCK_DATA_CONFIG, BASE_PRICES
+from config import AKSHARE_CONFIG, MOCK_DATA_CONFIG, BASE_PRICES, PERFORMANCE_CONFIG, STOCK_CODE_REGEX
 from utils.logger import logger
 from utils.cache import cache
-import re
 import random
 
 class StockService:
@@ -30,7 +29,7 @@ class StockService:
         if not code:
             return False, "股票代码不能为空"
         
-        if not re.match(r"^\d{6}(_sh)?$", code):
+        if not STOCK_CODE_REGEX.match(code):
             return False, "股票代码格式错误，应为6位数字"
         
         return True, ""
