@@ -39,39 +39,50 @@ class DataCollector:
             for i, stock in enumerate(stocks):
                 try:
                     # 获取最新数据
-                    klines = StockService.get_history_kline(
+                    response = StockService.get_history_kline(
                         stock.code,
                         period=period,
                         start_date=(datetime.now() - timedelta(days=30)).strftime("%Y-%m-%d"),
                         end_date=datetime.now().strftime("%Y-%m-%d")
                     )
                     
-                    if klines:
-                        # 增量保存到数据库
-                        for kline in klines:
-                            existing = db.query(KLine).filter(
-                                KLine.stock_code == stock.code,
-                                KLine.date == kline['date']
-                            ).first()
-                            
-                            if not existing:
-                                new_kline = KLine(
-                                    stock_code=stock.code,
-                                    date=datetime.strptime(kline['date'], "%Y-%m-%d").date(),
-                                    open=kline['open'],
-                                    high=kline['high'],
-                                    low=kline['low'],
-                                    close=kline['close'],
-                                    volume=kline['volume']
-                                )
-                                db.add(new_kline)
-                        
-                        db.commit()
-                        success += 1
-                    else:
+                    # 检查响应是否成功
+                    if response.get("code") != 0:
+                        logger.warning(f"获取 {stock.code} 失败: {response.get('message')}")
                         failed += 1
+                        continue
+                    
+                    klines = response.get("data", [])
+                    if not klines:
+                        failed += 1
+                        continue
+                    
+                    # 增量保存到数据库
+                    for kline in klines:
+                        date_str = kline.get("date") if isinstance(kline, dict) else None
+                        if not date_str:
+                            continue
                         
-                    logger.info(f"进度: {i+1}/{total} - {stock.code} {'成功' if klines else '无数据'}")
+                        existing = db.query(KLine).filter(
+                            KLine.stock_code == stock.code,
+                            KLine.date == datetime.strptime(date_str, "%Y-%m-%d").date()
+                        ).first()
+                        
+                        if not existing:
+                            new_kline = KLine(
+                                stock_code=stock.code,
+                                date=datetime.strptime(date_str, "%Y-%m-%d").date(),
+                                open=float(kline.get("open", 0)),
+                                high=float(kline.get("high", 0)),
+                                low=float(kline.get("low", 0)),
+                                close=float(kline.get("close", 0)),
+                                volume=float(kline.get("volume", 0))
+                            )
+                            db.add(new_kline)
+                    
+                    db.commit()
+                    success += 1
+                    logger.info(f"进度: {i+1}/{total} - {stock.code} 成功 ({len(klines)}条)")
                     
                 except Exception as e:
                     logger.error(f"更新 {stock.code} 失败: {e}")
@@ -93,13 +104,18 @@ class DataCollector:
         try:
             logger.info(f"开始更新股票 {stock_code}...")
             
-            klines = StockService.get_history_kline(
+            response = StockService.get_history_kline(
                 stock_code,
                 period=period,
                 start_date=(datetime.now() - timedelta(days=365)).strftime("%Y-%m-%d"),
                 end_date=datetime.now().strftime("%Y-%m-%d")
             )
             
+            # 检查响应是否成功
+            if response.get("code") != 0:
+                return {"code": stock_code, "status": "error", "message": response.get("message")}
+            
+            klines = response.get("data", [])
             if not klines:
                 return {"code": stock_code, "status": "no_data"}
             
@@ -107,20 +123,29 @@ class DataCollector:
             db = SessionLocal()
             try:
                 for kline in klines:
+                    # 处理字典格式
+                    if isinstance(kline, dict):
+                        date_str = kline.get("date")
+                    else:
+                        continue
+                    
+                    if not date_str:
+                        continue
+                    
                     existing = db.query(KLine).filter(
                         KLine.stock_code == stock_code,
-                        KLine.date == kline['date']
+                        KLine.date == datetime.strptime(date_str, "%Y-%m-%d").date()
                     ).first()
                     
                     if not existing:
                         new_kline = KLine(
                             stock_code=stock_code,
-                            date=datetime.strptime(kline['date'], "%Y-%m-%d").date(),
-                            open=kline['open'],
-                            high=kline['high'],
-                            low=kline['low'],
-                            close=kline['close'],
-                            volume=kline['volume']
+                            date=datetime.strptime(date_str, "%Y-%m-%d").date(),
+                            open=float(kline.get("open", 0)),
+                            high=float(kline.get("high", 0)),
+                            low=float(kline.get("low", 0)),
+                            close=float(kline.get("close", 0)),
+                            volume=float(kline.get("volume", 0))
                         )
                         db.add(new_kline)
                 
