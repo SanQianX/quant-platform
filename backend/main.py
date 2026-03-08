@@ -32,6 +32,7 @@ from api.monitor import router as monitor_router
 from api.auth import router as auth_router
 from api.export import router as export_router
 from api.users import router as users_router
+from api.indicators import router as indicators_router
 from middleware.request_log import log_requests
 from middleware.metrics_middleware import MetricsMiddleware
 from middleware.error_handler import setup_error_handlers
@@ -74,6 +75,7 @@ app.include_router(monitor_router)
 app.include_router(auth_router)
 app.include_router(export_router)
 app.include_router(users_router)
+app.include_router(indicators_router)
 
 # 启动事件
 @app.on_event("startup")
