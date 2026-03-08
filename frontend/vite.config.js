@@ -5,6 +5,9 @@ export default defineConfig({
   plugins: [vue()],
   server: {
     port: 3000,
+    headers: {
+      'Content-Type': 'text/html; charset=utf-8'
+    },
     proxy: {
       '/api': {
         target: 'http://localhost:8000',
