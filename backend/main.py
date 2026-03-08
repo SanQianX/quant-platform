@@ -9,13 +9,14 @@
 - 数据导出 (CSV/JSON)
 - 定时任务
 - 缓存管理
+- 监控指标
 
 技术栈:
 - FastAPI: Web框架
 - SQLAlchemy: ORM
 - AkShare/Tushare: 金融数据源
 - APScheduler: 定时任务
-- Redis: 缓存
+- 缓存: 内存缓存
 """
 
 from fastapi import FastAPI
@@ -27,7 +28,10 @@ from api.health import router as health_router
 from api.version import v1_router
 from api.scheduler import router as scheduler_router
 from api.cache import router as cache_router
+from api.monitor import router as monitor_router
 from middleware.request_log import log_requests
+from middleware.metrics_middleware import MetricsMiddleware
+from middleware.error_handler import setup_error_handlers
 from config import API_CONFIG, ENV
 import init_data
 
@@ -50,6 +54,12 @@ app.add_middleware(
 # 添加请求日志中间件
 app.middleware("http")(log_requests)
 
+# 添加性能监控中间件
+app.add_middleware(MetricsMiddleware)
+
+# 设置错误处理器
+setup_error_handlers(app)
+
 # 注册路由
 app.include_router(stock_router)
 app.include_router(stock_extra_router)
@@ -57,6 +67,7 @@ app.include_router(health_router)
 app.include_router(v1_router)
 app.include_router(scheduler_router)
 app.include_router(cache_router)
+app.include_router(monitor_router)
 
 # 启动事件
 @app.on_event("startup")
