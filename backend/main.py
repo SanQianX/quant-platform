@@ -7,11 +7,15 @@
 - 股票搜索
 - K线数据获取
 - 数据导出 (CSV/JSON)
+- 定时任务
+- 缓存管理
 
 技术栈:
 - FastAPI: Web框架
 - SQLAlchemy: ORM
-- AkShare: 金融数据源
+- AkShare/Tushare: 金融数据源
+- APScheduler: 定时任务
+- Redis: 缓存
 """
 
 from fastapi import FastAPI
@@ -21,6 +25,8 @@ from api.stock import router as stock_router
 from api.stock_extra import router as stock_extra_router
 from api.health import router as health_router
 from api.version import v1_router
+from api.scheduler import router as scheduler_router
+from api.cache import router as cache_router
 from middleware.request_log import log_requests
 from config import API_CONFIG, ENV
 import init_data
@@ -49,6 +55,8 @@ app.include_router(stock_router)
 app.include_router(stock_extra_router)
 app.include_router(health_router)
 app.include_router(v1_router)
+app.include_router(scheduler_router)
+app.include_router(cache_router)
 
 # 启动事件
 @app.on_event("startup")

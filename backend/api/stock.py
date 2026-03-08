@@ -99,3 +99,26 @@ def get_stock_kline(code: str):
         dict: 统一响应格式，包含K线数据列表
     """
     return StockService.get_kline_data(code)
+
+@router.get("/{code}/history")
+def get_stock_history(
+    code: str,
+    period: str = Query("daily", description="周期: daily/weekly/monthly"),
+    start_date: str = Query(None, description="开始日期 YYYY-MM-DD"),
+    end_date: str = Query(None, description="结束日期 YYYY-MM-DD")
+):
+    """
+    获取股票历史K线数据
+    
+    获取指定股票的历史K线数据，支持日线、周线、月线
+    
+    Args:
+        code: 股票代码
+        period: 数据周期 (daily/weekly/monthly)
+        start_date: 开始日期
+        end_date: 结束日期
+        
+    Returns:
+        dict: 统一响应格式，包含历史K线数据
+    """
+    return StockService.get_history_kline(code, period, start_date, end_date)

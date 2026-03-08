@@ -7,6 +7,8 @@
 """
 
 import akshare as ak
+import tushare as ts
+import os
 import pandas as pd
 from datetime import datetime, timedelta
 from database import SessionLocal
@@ -16,6 +18,21 @@ from config import AKSHARE_CONFIG, MOCK_DATA_CONFIG, BASE_PRICES, PERFORMANCE_CO
 from utils.logger import logger
 from utils.cache import cache
 import random
+
+# Tushare Token 配置
+TUSHARE_TOKEN = os.environ.get("TUSHARE_TOKEN", "")
+_tushare_initialized = False
+
+def _init_tushare():
+    """初始化 Tushare"""
+    global _tushare_initialized
+    if TUSHARE_TOKEN and not _tushare_initialized:
+        try:
+            ts.set_token(TUSHARE_TOKEN)
+            _tushare_initialized = True
+            print("Tushare 初始化成功")
+        except Exception as e:
+            print(f"Tushare 初始化失败: {e}")
 
 class StockService:
     """股票数据服务"""
@@ -297,5 +314,97 @@ class StockService:
                 return success_response(mock_data)
             
             return error_response(error_msg)
+        finally:
+            db.close()
+    
+    @staticmethod
+    def fetch_kline_from_tushare(stock_code: str, market: str = "sh", 
+                                  start_date: str = None, end_date: str = None,
+                                  period: str = "daily") -> pd.DataFrame:
+        """从Tushare获取K线数据"""
+        _init_tushare()
+        try:
+            if not end_date:
+                end_date = datetime.now().strftime("%Y%m%d")
+            if not start_date:
+                start_date = (datetime.now() - timedelta(days=365)).strftime("%Y%m%d")
+            
+            ts_code = f"{stock_code}.SH" if market == "sh" else f"{stock_code}.SZ"
+            pro = ts.pro_api()
+            
+            if period == "daily":
+                df = pro.daily(ts_code=ts_code, start_date=start_date, end_date=end_date)
+            elif period == "weekly":
+                df = pro.weekly(ts_code=ts_code, start_date=start_date, end_date=end_date)
+            elif period == "monthly":
+                df = pro.monthly(ts_code=ts_code, start_date=start_date, end_date=end_date)
+            else:
+                return pd.DataFrame()
+            
+            if df is None or df.empty:
+                return pd.DataFrame()
+            
+            df = df.rename(columns={'trade_date': 'date', 'vol': 'volume'})
+            df['date'] = pd.to_datetime(df['date']).dt.strftime('%Y-%m-%d')
+            return df.sort_values('date')
+        except Exception as e:
+            print(f"获取Tushare数据失败: {e}")
+            return pd.DataFrame()
+    
+    @staticmethod
+    def get_history_kline(stock_code: str, period: str = "daily", 
+                          start_date: str = None, end_date: str = None):
+        """获取股票历史K线数据（支持日线、周线、月线）"""
+        is_valid, error_msg = StockService.validate_stock_code(stock_code)
+        if not is_valid:
+            return error_response(error_msg)
+        
+        cache_key = f"kline:{stock_code}:{period}"
+        cached_data = cache.get(cache_key)
+        if cached_data:
+            return success_response(cached_data)
+        
+        if not end_date:
+            end_date = datetime.now().strftime("%Y-%m-%d")
+        if not start_date:
+            start_date = (datetime.now() - timedelta(days=365)).strftime("%Y-%m-%d")
+        
+        db = SessionLocal()
+        try:
+            stock = db.query(Stock).filter(Stock.code == stock_code).first()
+            if not stock:
+                return error_response(f"未找到股票: {stock_code}")
+            
+            if TUSHARE_TOKEN:
+                df = StockService.fetch_kline_from_tushare(
+                    stock_code, stock.market,
+                    start_date.replace("-", ""),
+                    end_date.replace("-", ""), period)
+            else:
+                s_ak = start_date.replace("-", "")
+                e_ak = end_date.replace("-", "")
+                symbol = f"{stock.market}{stock_code}"
+                df = ak.stock_zh_a_hist(symbol=symbol, period=period, start_date=s_ak, end_date=e_ak, adjust="qfq") if period in ["daily", "weekly", "monthly"] else pd.DataFrame()
+            
+            if df is None or df.empty:
+                if MOCK_DATA_CONFIG["enabled"]:
+                    mock = StockService.get_mock_kline_data(stock_code)
+                    cache.set(cache_key, mock, ttl=60)
+                    return success_response(mock)
+                return error_response("无法获取数据")
+            
+            klines = []
+            for _, r in df.iterrows():
+                d = r.get("date") or r.get("日期") or r.get("trade_date")
+                if not d: continue
+                if "open" in r:
+                    klines.append({"date": str(d), "open": float(r.get("open", 0) or 0), "high": float(r.get("high", 0) or 0), "low": float(r.get("low", 0) or 0), "close": float(r.get("close", 0) or 0), "volume": float(r.get("volume", 0) or 0)})
+                else:
+                    klines.append({"date": str(d), "open": float(r.get("开盘", 0)), "high": float(r.get("最高", 0)), "low": float(r.get("最低", 0)), "close": float(r.get("收盘", 0)), "volume": float(r.get("成交量", 0))})
+            
+            cache.set(cache_key, klines, ttl={"daily": 300, "weekly": 1800, "monthly": 3600}.get(period, 300))
+            return success_response(klines)
+        except Exception as e:
+            return error_response(f"获取历史K线失败: {str(e)}")
         finally:
             db.close()
