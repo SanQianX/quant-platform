@@ -14,10 +14,12 @@ from api.auth import get_current_user_dep, get_admin_user
 router = APIRouter(prefix="/api/users", tags=["用户管理"])
 
 # 内存存储（生产环境应使用数据库）
+# 初始用户 - 密码与 auth_service.MOCK_USERS 保持一致
 users_db = {
     "admin": {
         "id": "1",
         "username": "admin",
+        "password": AuthService.get_password_hash("admin123"),
         "email": "admin@quant.local",
         "role": "admin",
         "is_active": True,
@@ -27,6 +29,7 @@ users_db = {
     "user": {
         "id": "2",
         "username": "user",
+        "password": AuthService.get_password_hash("user123"),
         "email": "user@quant.local",
         "role": "user",
         "is_active": True,
@@ -236,25 +239,40 @@ def get_my_profile(current_user: dict = Depends(get_current_user_dep)):
 
 @router.put("/me/password")
 def change_password(
-    old_password: str,
-    new_password: str,
+    password_data: dict,
     current_user: dict = Depends(get_current_user_dep)
 ):
     """
     修改当前用户密码
+    
+    请求体:
+    {
+        "old_password": "原密码",
+        "new_password": "新密码"
+    }
     """
+    old_password = password_data.get("old_password", "")
+    new_password = password_data.get("new_password", "")
+    
+    if not old_password or not new_password:
+        raise HTTPException(status_code=400, detail="原密码和新密码都不能为空")
+    
     username = current_user["username"]
     user = users_db.get(username)
     
     if not user:
         raise HTTPException(status_code=404, detail="用户不存在")
     
-    # 验证旧密码
-    if not AuthService.verify_password(old_password, user["password_hash"]):
+    # 验证旧密码 - users_db uses "password" not "password_hash"
+    stored_password = user.get("password", user.get("password_hash", ""))
+    if not AuthService.verify_password(old_password, stored_password):
         raise HTTPException(status_code=400, detail="原密码错误")
     
-    # 更新密码
-    user["password_hash"] = AuthService.get_password_hash(new_password)
+    # 更新密码 - use same key as storage
+    if "password" in user:
+        user["password"] = AuthService.get_password_hash(new_password)
+    else:
+        user["password_hash"] = AuthService.get_password_hash(new_password)
     user["updated_at"] = datetime.now().isoformat()
     
     return {"message": "密码修改成功"}
