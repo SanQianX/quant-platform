@@ -54,10 +54,28 @@ def detailed_health():
         checks["checks"].append({"name": "database", "status": "error", "message": str(e)})
         checks["status"] = "unhealthy"
     
-    # 2. 缓存检查
+    # 2. 缓存检查（Redis + 内存缓存）
     try:
-        cache_size = cache.size()
-        checks["checks"].append({"name": "cache", "status": "ok", "keys": cache_size})
+        # 尝试导入Redis缓存
+        try:
+            from services.redis_cache import cache as redis_cache
+            cache_to_check = redis_cache
+            cache_stats = cache_to_check.get_stats()
+            cache_status = "ok"
+            cache_backend = cache_stats.get("backend", "unknown")
+        except ImportError:
+            from utils.cache import cache as memory_cache
+            cache_to_check = memory_cache
+            cache_stats = {"keys": cache_to_check.size()}
+            cache_status = "ok"
+            cache_backend = "memory"
+        
+        checks["checks"].append({
+            "name": "cache", 
+            "status": cache_status, 
+            "keys": cache_stats.get("keys", 0),
+            "backend": cache_backend
+        })
     except Exception as e:
         checks["checks"].append({"name": "cache", "status": "error", "message": str(e)})
     
