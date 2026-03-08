@@ -30,6 +30,7 @@ from api.scheduler import router as scheduler_router
 from api.cache import router as cache_router
 from api.monitor import router as monitor_router
 from api.auth import router as auth_router
+from api.export import router as export_router
 from middleware.request_log import log_requests
 from middleware.metrics_middleware import MetricsMiddleware
 from middleware.error_handler import setup_error_handlers
@@ -70,6 +71,7 @@ app.include_router(scheduler_router)
 app.include_router(cache_router)
 app.include_router(monitor_router)
 app.include_router(auth_router)
+app.include_router(export_router)
 
 # 启动事件
 @app.on_event("startup")
