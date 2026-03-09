@@ -75,6 +75,7 @@ from api.limit_price import router as limit_price_router
 from api.order_book import router as order_book_router
 from api.tick import router as tick_router
 from api.queue import router as queue_router
+from api.news_history import router as news_history_router
 from middleware.request_log import log_requests
 from middleware.metrics_middleware import MetricsMiddleware
 from middleware.error_handler import setup_error_handlers
@@ -161,6 +162,7 @@ app.include_router(limit_price_router)
 app.include_router(order_book_router)
 app.include_router(tick_router)
 app.include_router(queue_router)
+app.include_router(news_history_router)
 
 # 启动事件
 @app.on_event("startup")
