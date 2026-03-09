@@ -51,6 +51,7 @@ from api.advanced_filter import router as advanced_filter_router
 from api.settings import router as settings_router
 from api.options import router as options_router
 from api.flow import router as flow_router
+from api.flow_history import router as flow_history_router
 from api.toplist import router as toplist_router
 from api.etf import router as etf_router
 from api.bond import router as bond_router
@@ -137,6 +138,7 @@ app.include_router(advanced_filter_router)
 app.include_router(settings_router)
 app.include_router(options_router)
 app.include_router(flow_router)
+app.include_router(flow_history_router, prefix="/api/flow")
 app.include_router(toplist_router)
 app.include_router(etf_router)
 app.include_router(bond_router)
