@@ -33,6 +33,7 @@ from api.auth import router as auth_router
 from api.export import router as export_router
 from api.users import router as users_router
 from api.indicators import router as indicators_router
+from api.signals import router as signals_router
 from api.filter import router as filter_router
 from api.data_quality import router as data_quality_router
 from api.financial import router as financial_router
@@ -82,6 +83,7 @@ app.include_router(auth_router)
 app.include_router(export_router)
 app.include_router(users_router)
 app.include_router(indicators_router)
+app.include_router(signals_router)
 app.include_router(filter_router)
 app.include_router(data_quality_router)
 app.include_router(financial_router)
