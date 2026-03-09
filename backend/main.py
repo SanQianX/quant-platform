@@ -53,6 +53,7 @@ from api.options import router as options_router
 from api.flow import router as flow_router
 from api.flow_history import router as flow_history_router
 from api.toplist import router as toplist_router
+from api.toplist_history import router as toplist_history_router
 from api.etf import router as etf_router
 from api.bond import router as bond_router
 from api.ipo import router as ipo_router
@@ -140,6 +141,7 @@ app.include_router(options_router)
 app.include_router(flow_router)
 app.include_router(flow_history_router, prefix="/api/flow")
 app.include_router(toplist_router)
+app.include_router(toplist_history_router)
 app.include_router(etf_router)
 app.include_router(bond_router)
 app.include_router(ipo_router)
