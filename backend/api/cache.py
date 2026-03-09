@@ -73,11 +73,11 @@ def ping_cache():
     """
     检查缓存连接状态
     """
-    is_connected = cache.ping()
+    ping_result = cache.ping()
     return {
         "code": 0,
-        "connected": is_connected,
-        "backend": "redis" if is_connected else "memory"
+        "connected": ping_result.get("connected", False),
+        "backend": ping_result.get("backend", "memory")
     }
 
 @router.post("/set")

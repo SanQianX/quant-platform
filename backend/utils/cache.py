@@ -98,7 +98,7 @@ class SimpleCache:
 
     def ping(self):
         """检查缓存连接状态"""
-        return True
+        return {"connected": True, "backend": "memory"}
 
 
 # 创建全局缓存实例
