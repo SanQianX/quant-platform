@@ -19,27 +19,18 @@ def get_balance_sheet(
 ):
     """
     获取资产负债表
-    
-    Args:
-        code: 股票代码
-        year: 年份
-        quarter: 季度
-        
-    Returns:
-        资产负债表数据
     """
     try:
-        # 转换股票代码格式
         symbol = f"{code}"
         
-        # 使用 AkShare 获取资产负债表
-        df = ak.stock_balancesheet_a(symbol=symbol, year=year, quarter=quarter)
+        # 使用东方财富接口
+        df = ak.stock_balance_sheet_by_report_em(symbol=symbol)
         
         if df is None or df.empty:
             return {"code": 0, "data": [], "message": "暂无数据"}
         
         # 转换为字典列表
-        data = df.to_dict(orient="records")
+        data = df.head(20).to_dict(orient="records")
         
         return {"code": 0, "data": data}
         
@@ -55,24 +46,17 @@ def get_income_statement(
 ):
     """
     获取利润表
-    
-    Args:
-        code: 股票代码
-        year: 年份
-        quarter: 季度
-        
-    Returns:
-        利润表数据
     """
     try:
         symbol = f"{code}"
         
-        df = ak.stock_income_a(symbol=symbol, year=year, quarter=quarter)
+        # 使用财务摘要接口
+        df = ak.stock_financial_abstract(symbol=symbol, indicator="按报告期")
         
         if df is None or df.empty:
             return {"code": 0, "data": [], "message": "暂无数据"}
         
-        data = df.to_dict(orient="records")
+        data = df.head(20).to_dict(orient="records")
         
         return {"code": 0, "data": data}
         
@@ -88,24 +72,17 @@ def get_cashflow_statement(
 ):
     """
     获取现金流量表
-    
-    Args:
-        code: 股票代码
-        year: 年份
-        quarter: 季度
-        
-    Returns:
-        现金流量表数据
     """
     try:
         symbol = f"{code}"
         
-        df = ak.stock_cashflow_a(symbol=symbol, year=year, quarter=quarter)
+        # 使用现金流量表接口
+        df = ak.stock_financial_cash_ths(symbol=symbol)
         
         if df is None or df.empty:
             return {"code": 0, "data": [], "message": "暂无数据"}
         
-        data = df.to_dict(orient="records")
+        data = df.head(20).to_dict(orient="records")
         
         return {"code": 0, "data": data}
         
@@ -121,24 +98,17 @@ def get_financial_indicator(
 ):
     """
     获取财务指标
-    
-    Args:
-        code: 股票代码
-        year: 年份
-        quarter: 季度
-        
-    Returns:
-        财务指标数据
     """
     try:
         symbol = f"{code}"
         
-        df = ak.stock_financial_abstract_a(symbol=symbol, year=year, quarter=quarter)
+        # 使用财务分析指标接口
+        df = ak.stock_financial_analysis_indicator_em(symbol=symbol)
         
         if df is None or df.empty:
             return {"code": 0, "data": [], "message": "暂无数据"}
         
-        data = df.to_dict(orient="records")
+        data = df.head(20).to_dict(orient="records")
         
         return {"code": 0, "data": data}
         
@@ -154,54 +124,44 @@ def get_all_financial_data(
 ):
     """
     获取所有财务数据
-    
-    Args:
-        code: 股票代码
-        year: 年份
-        quarter: 季度
-        
-    Returns:
-        所有财务数据
     """
     result = {
         "stock_code": code,
-        "year": year,
-        "quarter": quarter,
         "balance": [],
         "income": [],
         "cashflow": [],
         "indicator": []
     }
     
-    # 获取资产负债表
+    # 资产负债表
     try:
-        df = ak.stock_balancesheet_a(symbol=f"{code}", year=year, quarter=quarter)
+        df = ak.stock_balance_sheet_by_report_em(symbol=f"{code}")
         if df is not None and not df.empty:
-            result["balance"] = df.to_dict(orient="records")[:10]
+            result["balance"] = df.head(10).to_dict(orient="records")
     except:
         pass
     
-    # 获取利润表
+    # 利润表
     try:
-        df = ak.stock_income_a(symbol=f"{code}", year=year, quarter=quarter)
+        df = ak.stock_financial_abstract(symbol=f"{code}", indicator="按报告期")
         if df is not None and not df.empty:
-            result["income"] = df.to_dict(orient="records")[:10]
+            result["income"] = df.head(10).to_dict(orient="records")
     except:
         pass
     
-    # 获取现金流量表
+    # 现金流量表
     try:
-        df = ak.stock_cashflow_a(symbol=f"{code}", year=year, quarter=quarter)
+        df = ak.stock_financial_cash_ths(symbol=f"{code}")
         if df is not None and not df.empty:
-            result["cashflow"] = df.to_dict(orient="records")[:10]
+            result["cashflow"] = df.head(10).to_dict(orient="records")
     except:
         pass
     
-    # 获取财务指标
+    # 财务指标
     try:
-        df = ak.stock_financial_abstract_a(symbol=f"{code}", year=year, quarter=quarter)
+        df = ak.stock_financial_analysis_indicator_em(symbol=f"{code}")
         if df is not None and not df.empty:
-            result["indicator"] = df.to_dict(orient="records")[:10]
+            result["indicator"] = df.head(10).to_dict(orient="records")
     except:
         pass
     
