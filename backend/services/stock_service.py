@@ -14,7 +14,7 @@ from datetime import datetime, timedelta
 from database import SessionLocal
 from models.stock import Stock, KLine
 from models.response import success_response, error_response
-from config import AKSHARE_CONFIG, MOCK_DATA_CONFIG, BASE_PRICES, PERFORMANCE_CONFIG, STOCK_CODE_REGEX
+from config import AKSHARE_CONFIG, MOCK_DATA_CONFIG, BASE_PRICES, PERFORMANCE_CONFIG, STOCK_CODE_REGEX, STOCK_LIST
 from utils.logger import logger
 from utils.cache import cache
 import random
@@ -94,42 +94,31 @@ class StockService:
     def search_stocks(keyword: str):
         """
         搜索股票
-        
+
         Args:
             keyword: 搜索关键词（股票代码或名称）
-            
+
         Returns:
             dict: 统一响应格式
         """
         try:
             if not keyword or len(keyword.strip()) == 0:
                 return error_response("搜索关键词不能为空")
-            
+
             logger.info(f"搜索股票: {keyword}")
-            
-            db = SessionLocal()
-            stocks = db.query(Stock).filter(
-                (Stock.name.like(f"%{keyword}%")) | 
-                (Stock.code.like(f"%{keyword}%"))
-            ).all()
-            
+
+            # 使用配置文件中的股票列表进行搜索
+            keyword_lower = keyword.lower()
             result = [
-                {
-                    "code": s.code,
-                    "name": s.name,
-                    "market": s.market,
-                    "stock_type": s.stock_type
-                }
-                for s in stocks
+                stock for stock in STOCK_LIST
+                if keyword_lower in stock["code"].lower() or keyword_lower in stock["name"].lower()
             ]
-            
+
             logger.info(f"搜索'{keyword}'找到{len(result)}条结果")
             return success_response(result)
         except Exception as e:
             logger.error(f"搜索失败: {e}")
             return error_response(f"搜索失败: {str(e)}")
-        finally:
-            db.close()
     
     @staticmethod
     def fetch_kline_from_akshare(stock_code: str, market: str = "sh") -> pd.DataFrame:
