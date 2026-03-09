@@ -49,6 +49,7 @@ from api.chart import router as chart_router
 from api.advanced_filter import router as advanced_filter_router
 from api.settings import router as settings_router
 from api.options import router as options_router
+from api.flow import router as flow_router
 from middleware.request_log import log_requests
 from middleware.metrics_middleware import MetricsMiddleware
 from middleware.error_handler import setup_error_handlers
@@ -109,6 +110,7 @@ app.include_router(chart_router)
 app.include_router(advanced_filter_router)
 app.include_router(settings_router)
 app.include_router(options_router)
+app.include_router(flow_router)
 
 # 启动事件
 @app.on_event("startup")
