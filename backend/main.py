@@ -67,6 +67,7 @@ from api.top_institution import router as top_institution_router
 from api.dividend import router as dividend_router
 from api.rights_issue import router as rights_issue_router
 from api.suspension import router as suspension_router
+from api.limit_price import router as limit_price_router
 from middleware.request_log import log_requests
 from middleware.metrics_middleware import MetricsMiddleware
 from middleware.error_handler import setup_error_handlers
@@ -145,6 +146,7 @@ app.include_router(top_institution_router)
 app.include_router(dividend_router)
 app.include_router(rights_issue_router)
 app.include_router(suspension_router)
+app.include_router(limit_price_router)
 
 # 启动事件
 @app.on_event("startup")
