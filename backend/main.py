@@ -24,6 +24,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from api.stock import router as stock_router
 from api.stock_extra import router as stock_extra_router
+from api.adj import router as adj_router
 from api.health import router as health_router
 from api.version import v1_router
 from api.scheduler import router as scheduler_router
@@ -98,6 +99,7 @@ setup_error_handlers(app)
 app.include_router(quote_router)
 app.include_router(stock_router)
 app.include_router(stock_extra_router)
+app.include_router(adj_router)
 app.include_router(health_router)
 app.include_router(v1_router)
 app.include_router(scheduler_router)
