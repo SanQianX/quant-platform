@@ -54,6 +54,7 @@ from api.toplist import router as toplist_router
 from api.etf import router as etf_router
 from api.bond import router as bond_router
 from api.ipo import router as ipo_router
+from api.futures import router as futures_router
 from middleware.request_log import log_requests
 from middleware.metrics_middleware import MetricsMiddleware
 from middleware.error_handler import setup_error_handlers
@@ -119,6 +120,7 @@ app.include_router(toplist_router)
 app.include_router(etf_router)
 app.include_router(bond_router)
 app.include_router(ipo_router)
+app.include_router(futures_router)
 
 # 启动事件
 @app.on_event("startup")
