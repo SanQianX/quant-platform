@@ -57,6 +57,7 @@ from api.bond import router as bond_router
 from api.ipo import router as ipo_router
 from api.futures import router as futures_router
 from api.hkstock import router as hkstock_router
+from api.profile import router as profile_router
 from api.usstock import router as usstock_router
 from api.margin import router as margin_router
 from api.block_trade import router as block_trade_router
@@ -103,6 +104,7 @@ app.add_middleware(MetricsMiddleware)
 setup_error_handlers(app)
 
 # 注册路由
+app.include_router(profile_router)
 app.include_router(quote_router)
 app.include_router(stock_router)
 app.include_router(stock_extra_router)
