@@ -36,6 +36,7 @@ from api.indicators import router as indicators_router
 from api.filter import router as filter_router
 from api.data_quality import router as data_quality_router
 from api.financial import router as financial_router
+from api.quote import router as quote_router
 from middleware.request_log import log_requests
 from middleware.metrics_middleware import MetricsMiddleware
 from middleware.error_handler import setup_error_handlers
@@ -68,6 +69,7 @@ app.add_middleware(MetricsMiddleware)
 setup_error_handlers(app)
 
 # 注册路由
+app.include_router(quote_router)
 app.include_router(stock_router)
 app.include_router(stock_extra_router)
 app.include_router(health_router)
@@ -82,6 +84,7 @@ app.include_router(indicators_router)
 app.include_router(filter_router)
 app.include_router(data_quality_router)
 app.include_router(financial_router)
+app.include_router(quote_router)
 
 # 启动事件
 @app.on_event("startup")
