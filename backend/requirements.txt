@@ -3,6 +3,8 @@ fastapi==0.109.0
 uvicorn==0.27.0
 akshare==1.18.35
 tushare==1.4.9
+apscheduler==3.10.4
+bcrypt==4.1.2
 pandas==2.1.4
 sqlalchemy==2.0.25
 psycopg2-binary==2.9.9
