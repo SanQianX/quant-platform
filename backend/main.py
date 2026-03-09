@@ -65,6 +65,7 @@ from api.restricted_share import router as restricted_share_router
 from api.broker import router as broker_router
 from api.top_institution import router as top_institution_router
 from api.dividend import router as dividend_router
+from api.rights_issue import router as rights_issue_router
 from middleware.request_log import log_requests
 from middleware.metrics_middleware import MetricsMiddleware
 from middleware.error_handler import setup_error_handlers
@@ -141,6 +142,7 @@ app.include_router(restricted_share_router)
 app.include_router(broker_router)
 app.include_router(top_institution_router)
 app.include_router(dividend_router)
+app.include_router(rights_issue_router)
 
 # 启动事件
 @app.on_event("startup")
