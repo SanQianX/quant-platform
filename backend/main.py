@@ -43,6 +43,7 @@ from api.portfolio import router as portfolio_router
 from api.risk import router as risk_router
 from api.market import router as market_router
 from api.alert import router as alert_router
+from api.trade import router as trade_router
 from middleware.request_log import log_requests
 from middleware.metrics_middleware import MetricsMiddleware
 from middleware.error_handler import setup_error_handlers
@@ -97,6 +98,7 @@ app.include_router(portfolio_router)
 app.include_router(risk_router)
 app.include_router(market_router)
 app.include_router(alert_router)
+app.include_router(trade_router)
 
 # 启动事件
 @app.on_event("startup")
