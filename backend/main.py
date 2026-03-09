@@ -62,6 +62,7 @@ from api.block_trade import router as block_trade_router
 from api.holder_trade import router as holder_trade_router
 from api.restricted_share import router as restricted_share_router
 from api.broker import router as broker_router
+from api.top_institution import router as top_institution_router
 from middleware.request_log import log_requests
 from middleware.metrics_middleware import MetricsMiddleware
 from middleware.error_handler import setup_error_handlers
@@ -135,6 +136,7 @@ app.include_router(block_trade_router)
 app.include_router(holder_trade_router)
 app.include_router(restricted_share_router)
 app.include_router(broker_router)
+app.include_router(top_institution_router)
 
 # 启动事件
 @app.on_event("startup")
