@@ -8,8 +8,25 @@ from fastapi import APIRouter, HTTPException, Query, Path
 from typing import Optional
 import akshare as ak
 from datetime import datetime
+import math
+import json
 
 router = APIRouter(prefix="/api/stock", tags=["财务数据"])
+
+def clean_data(data):
+    """清理数据中的NaN和Inf值"""
+    if isinstance(data, dict):
+        return {k: clean_data(v) for k, v in data.items()}
+    elif isinstance(data, list):
+        return [clean_data(item) for item in data]
+    elif isinstance(data, float):
+        if math.isnan(data) or math.isinf(data):
+            return None
+        return data
+    elif isinstance(data, (int, str)):
+        return data
+    else:
+        return data
 
 @router.get("/{code}/financial/balance")
 def get_balance_sheet(
@@ -21,16 +38,35 @@ def get_balance_sheet(
     获取资产负债表
     """
     try:
-        symbol = f"{code}"
+        # 转换股票代码格式，添加市场后缀
+        if len(code) == 6:
+            if code.startswith(('6', '9')):
+                symbol = f"{code}.SH"
+            else:
+                symbol = f"{code}.SZ"
+        else:
+            symbol = code
         
-        # 使用东方财富接口
+        # 使用东方财富资产负债表接口
         df = ak.stock_balance_sheet_by_report_em(symbol=symbol)
         
-        if df is None or df.empty:
+        # 检查返回值类型
+        if df is None:
+            return {"code": 0, "data": [], "message": "暂无数据"}
+        
+        # 如果返回的是字典，尝试提取数据
+        if isinstance(df, dict):
+            if 'data' in df:
+                df = df['data']
+            if df is None or (hasattr(df, 'empty') and df.empty):
+                return {"code": 0, "data": [], "message": "暂无数据"}
+        
+        if hasattr(df, 'empty') and df.empty:
             return {"code": 0, "data": [], "message": "暂无数据"}
         
         # 转换为字典列表
         data = df.head(20).to_dict(orient="records")
+        data = clean_data(data)
         
         return {"code": 0, "data": data}
         
@@ -48,15 +84,34 @@ def get_income_statement(
     获取利润表
     """
     try:
-        symbol = f"{code}"
+        # 转换股票代码格式，添加市场后缀
+        if len(code) == 6:
+            if code.startswith(('6', '9')):
+                symbol = f"{code}.SH"
+            else:
+                symbol = f"{code}.SZ"
+        else:
+            symbol = code
         
-        # 使用财务摘要接口
-        df = ak.stock_financial_abstract(symbol=symbol, indicator="按报告期")
+        # 使用利润表接口
+        df = ak.stock_profit_sheet_by_report_em(symbol=symbol)
         
-        if df is None or df.empty:
+        # 检查返回值类型
+        if df is None:
+            return {"code": 0, "data": [], "message": "暂无数据"}
+        
+        # 如果返回的是字典，尝试提取数据
+        if isinstance(df, dict):
+            if 'data' in df:
+                df = df['data']
+            if df is None or (hasattr(df, 'empty') and df.empty):
+                return {"code": 0, "data": [], "message": "暂无数据"}
+        
+        if hasattr(df, 'empty') and df.empty:
             return {"code": 0, "data": [], "message": "暂无数据"}
         
         data = df.head(20).to_dict(orient="records")
+        data = clean_data(data)
         
         return {"code": 0, "data": data}
         
@@ -83,6 +138,7 @@ def get_cashflow_statement(
             return {"code": 0, "data": [], "message": "暂无数据"}
         
         data = df.head(20).to_dict(orient="records")
+        data = clean_data(data)
         
         return {"code": 0, "data": data}
         
@@ -100,15 +156,34 @@ def get_financial_indicator(
     获取财务指标
     """
     try:
-        symbol = f"{code}"
+        # 转换股票代码格式，添加市场后缀
+        if len(code) == 6:
+            if code.startswith(('6', '9')):
+                symbol = f"{code}.SH"
+            else:
+                symbol = f"{code}.SZ"
+        else:
+            symbol = code
         
         # 使用财务分析指标接口
         df = ak.stock_financial_analysis_indicator_em(symbol=symbol)
         
-        if df is None or df.empty:
+        # 检查返回值类型
+        if df is None:
+            return {"code": 0, "data": [], "message": "暂无数据"}
+        
+        # 如果返回的是字典，尝试提取数据
+        if isinstance(df, dict):
+            if 'data' in df:
+                df = df['data']
+            if df is None or (hasattr(df, 'empty') and df.empty):
+                return {"code": 0, "data": [], "message": "暂无数据"}
+        
+        if hasattr(df, 'empty') and df.empty:
             return {"code": 0, "data": [], "message": "暂无数据"}
         
         data = df.head(20).to_dict(orient="records")
+        data = clean_data(data)
         
         return {"code": 0, "data": data}
         
