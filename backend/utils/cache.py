@@ -74,5 +74,32 @@ class SimpleCache:
         with self._lock:
             return len(self._cache)
 
+    def get_stats(self):
+        """获取缓存统计"""
+        with self._lock:
+            return {
+                "status": "ok",
+                "keys": len(self._cache),
+                "backend": "memory"
+            }
+
+    def clear_all(self):
+        """清空所有缓存"""
+        self.clear()
+        return True
+
+    def delete_pattern(self, pattern: str):
+        """删除匹配的缓存"""
+        with self._lock:
+            keys_to_delete = [k for k in self._cache.keys() if pattern in k]
+            for k in keys_to_delete:
+                del self._cache[k]
+            return True
+
+    def ping(self):
+        """检查缓存连接状态"""
+        return True
+
+
 # 创建全局缓存实例
 cache = SimpleCache(default_ttl=300)
