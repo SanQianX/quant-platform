@@ -266,12 +266,28 @@
             // 实时价格
             currentPrice: null,
             priceChange: null,
-            debouncedSearch: null
+            debouncedSearch: null,
+            // 热门股票（初始显示）
+            hotStocks: [
+              { code: '600519', name: '贵州茅台', market: 'sh', stock_type: 'stock' },
+              { code: '000001', name: '平安银行', market: 'sz', stock_type: 'stock' },
+              { code: '600036', name: '招商银行', market: 'sh', stock_type: 'stock' },
+              { code: '000858', name: '五粮液', market: 'sz', stock_type: 'stock' },
+              { code: '002594', name: '比亚迪', market: 'sz', stock_type: 'stock' },
+              { code: '300750', name: '宁德时代', market: 'sz', stock_type: 'stock' },
+              { code: '601318', name: '中国平安', market: 'sh', stock_type: 'stock' },
+              { code: '600900', name: '长江电力', market: 'sh', stock_type: 'stock' },
+              { code: '600036', name: '招商银行', market: 'sh', stock_type: 'stock' },
+              { code: '300059', name: '东方财富', market: 'sz', stock_type: 'stock' }
+            ]
           };
         },
         computed: {
           stocks() {
-            return this.filteredStocks.length > 0 ? this.filteredStocks : this.allStocks;
+            // 有搜索结果时显示搜索结果，没有时显示热门股票
+            if (this.filteredStocks.length > 0) return this.filteredStocks;
+            if (this.keyword.trim()) return this.filteredStocks;
+            return this.hotStocks;
           },
           priceChangeClass() {
             if (!this.priceChange) return '';
