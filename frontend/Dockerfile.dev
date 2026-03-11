@@ -3,7 +3,7 @@ FROM node:18-alpine
 
 WORKDIR /app
 
-# 安装依赖
+# 先复制 package.json 和依赖安装
 COPY package*.json ./
 RUN npm install
 
