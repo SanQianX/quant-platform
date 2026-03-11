@@ -1,5 +1,5 @@
 # 量化数据平台 - Docker配置
-# 使用Windows路径格式
+# 支持: 后端 + 前端开发服务器 + PostgreSQL
 
 services:
   # PostgreSQL数据库
@@ -14,6 +14,8 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    networks:
+      - quant-network
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U quant_user"]
       interval: 10s
@@ -22,31 +24,78 @@ services:
 
   # FastAPI后端
   backend:
-    image: python:3.10-slim
+    build:
+      context: ../backend
+      dockerfile: Dockerfile
+    image: quant-backend:latest
     container_name: quant-backend
     ports:
       - "8000:8000"
     working_dir: /app
     environment:
       - DATABASE_URL=postgresql://quant_user:quant_pass@postgres:5432/quant_platform
+      - TUSHARE_TOKEN=${TUSHARE_TOKEN:-}
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_USER=quant_user
+      - DB_PASSWORD=quant_pass
+      - DB_NAME=quant_platform
+      - ENV=development
     depends_on:
       postgres:
         condition: service_healthy
     volumes:
-      - //f/quant-platform/backend:/app
-    command: sh -c "pip install -r requirements.txt && uvicorn main:app --host 0.0.0.0 --port 8000"
+      # 代码热更新 - 挂载本地代码到容器
+      - ../backend:/app
+    networks:
+      - quant-network
+    command: >
+      sh -c "pip install -r requirements.txt && 
+             uvicorn main:app --host 0.0.0.0 --port 8000 --reload"
 
-  # Vue3前端 (使用nginx服务)
-  frontend:
-    image: nginx:alpine
-    container_name: quant-frontend
+  # Vue3前端开发服务器 (使用Node)
+  frontend-dev:
+    build:
+      context: ../frontend
+      dockerfile: Dockerfile.dev
+    image: quant-frontend-dev:latest
+    container_name: quant-frontend-dev
     ports:
-      - "3000:80"
+      - "3000:3000"
+    working_dir: /app
+    environment:
+      # 容器内使用服务名，宿主机使用localhost
+      - VITE_API_BASE_URL=http://backend:8000
     volumes:
-      - //f/quant-platform/frontend:/usr/share/nginx/html:ro
-      - //f/quant-platform/frontend/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      # 代码热更新 - 挂载本地代码到容器
+      - ../frontend:/app
+      - /app/node_modules
+    networks:
+      - quant-network
     depends_on:
       - backend
+    command: npm run dev -- --host 0.0.0.0
+
+  # Vue3前端生产构建 (使用nginx)
+  frontend:
+    build:
+      context: ../frontend
+      dockerfile: Dockerfile
+    image: quant-frontend:latest
+    container_name: quant-frontend
+    ports:
+      - "3001:80"
+    volumes:
+      - ../frontend/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    networks:
+      - quant-network
+    depends_on:
+      - backend
+    # 生产环境使用nginx代理到后端
+
+networks:
+  quant-network:
+    driver: bridge
 
 volumes:
   postgres_data:

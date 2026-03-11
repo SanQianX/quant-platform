@@ -189,7 +189,35 @@ npm run dev
 
 ## 部署
 
-### Docker 部署
+### Docker 部署 (推荐)
+
+#### 1. 配置环境变量
+
+```bash
+# 复制环境变量模板
+cp .env.example .env
+
+# 编辑 .env 文件，填入 Tushare Token
+# 获取Token: https://tushare.pro 注册后获取
+```
+
+#### 2. 启动服务
+
+```bash
+cd deploy
+docker-compose up -d
+```
+
+#### 3. 访问应用
+
+- 前端开发服务器: http://localhost:3000
+- 前端生产版: http://localhost:3001
+- 后端API: http://localhost:8000
+- API文档: http://localhost:8000/docs
+
+详细部署指南: [Docker部署文档](docs/DEPLOYMENT.md)
+
+### 本地部署
 
 ```bash
 cd deploy

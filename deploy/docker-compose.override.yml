@@ -1,0 +1,23 @@
+# Docker Compose 覆盖配置
+# 此文件用于开发环境扩展配置
+# 会自动与 docker-compose.yml 合并
+
+services:
+  # 后端开发配置
+  backend:
+    environment:
+      - ENV=development
+      - DEBUG=true
+    # Windows: 使用 //f/ 格式挂载代码
+    # Linux/Mac: 使用相对路径
+    volumes:
+      - ../backend:/app
+
+  # 前端开发配置
+  frontend-dev:
+    environment:
+      - NODE_ENV=development
+      - VITE_API_BASE_URL=http://localhost:8000
+    volumes:
+      - ../frontend:/app
+      - /app/node_modules
