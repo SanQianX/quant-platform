@@ -5,9 +5,35 @@ import io
 import csv
 import json
 from services.stock_service import StockService
+from models.response import success_response
 
 # 创建路由
 router = APIRouter(prefix="/api/stock", tags=["股票"])
+
+# 支持的K线周期
+KLINE_PERIODS = ["daily", "weekly", "monthly", "1min", "5min", "15min", "30min", "60min"]
+
+@router.get("/periods")
+def get_supported_periods():
+    """
+    获取支持的K线周期
+    
+    Returns:
+        dict: 统一响应格式，包含支持的周期列表
+    """
+    return success_response({
+        "periods": KLINE_PERIODS,
+        "descriptions": {
+            "daily": "日线",
+            "weekly": "周线",
+            "monthly": "月线",
+            "1min": "1分钟线",
+            "5min": "5分钟线",
+            "15min": "15分钟线",
+            "30min": "30分钟线",
+            "60min": "60分钟线"
+        }
+    })
 
 @router.get("/list")
 def get_stock_list():
@@ -103,18 +129,28 @@ def get_stock_kline(code: str):
 @router.get("/{code}/history")
 def get_stock_history(
     code: str,
-    period: str = Query("daily", description="周期: daily/weekly/monthly"),
-    start_date: str = Query(None, description="开始日期 YYYY-MM-DD"),
-    end_date: str = Query(None, description="结束日期 YYYY-MM-DD")
+    period: str = Query("daily", description="周期: daily/weekly/monthly/1min/5min/15min/30min/60min"),
+    start_date: str = Query(None, description="开始日期 YYYY-MM-DD 或 YYYY-MM-DD HH:MM:SS"),
+    end_date: str = Query(None, description="结束日期 YYYY-MM-DD 或 YYYY-MM-DD HH:MM:SS")
 ):
     """
     获取股票历史K线数据
     
-    获取指定股票的历史K线数据，支持日线、周线、月线
+    获取指定股票的历史K线数据，支持多种周期
+    
+    周期说明:
+    - daily: 日线
+    - weekly: 周线
+    - monthly: 月线
+    - 1min: 1分钟线
+    - 5min: 5分钟线
+    - 15min: 15分钟线
+    - 30min: 30分钟线
+    - 60min: 60分钟线
     
     Args:
         code: 股票代码
-        period: 数据周期 (daily/weekly/monthly)
+        period: 数据周期
         start_date: 开始日期
         end_date: 结束日期
         
