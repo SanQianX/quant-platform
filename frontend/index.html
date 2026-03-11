@@ -27,11 +27,20 @@
       .stock-name { color: #333; }
       .stock-type { font-size: 12px; color: #999; padding: 2px 6px; background: #f0f0f0; border-radius: 4px; }
       .chart-container { background: white; padding: 20px; border-radius: 12px; min-height: 500px; }
-      .chart-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+      .chart-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 12px; }
+      .chart-title { display: flex; align-items: center; gap: 12px; }
       .chart-header h3 { color: #333; margin: 0; }
+      .current-price { font-size: 14px; font-weight: 500; }
+      .price-up { color: #ef232a; }
+      .price-down { color: #14b143; }
       .export-btns { display: flex; gap: 8px; }
       .export-btn { padding: 6px 12px; background: #52c41a; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 14px; }
       .export-btn:hover { background: #73d13d; }
+      /* 周期选择器样式 */
+      .period-selector { display: flex; gap: 4px; }
+      .period-btn { padding: 6px 14px; background: #f0f0f0; color: #333; border: none; border-radius: 4px; cursor: pointer; font-size: 14px; transition: all 0.2s; }
+      .period-btn:hover { background: #e0e0e0; }
+      .period-btn.active { background: #1890ff; color: white; }
       .loading, .empty { text-align: center; padding: 60px; color: #999; }
       .kline-chart { width: 100%; height: 500px; }
     </style>
@@ -39,9 +48,11 @@
   <body>
     <div id="app"></div>
     <script>
-      const { createApp, ref, onMounted, watch } = Vue;
+      const { createApp, ref, computed } = Vue;
       
       // Axios简单实现
+      // Docker环境通过nginx代理访问后端API (/api/* -> backend:8000)
+      // 开发环境直接访问
       const axios = {
         async get(url) {
           const res = await fetch(url);
@@ -49,31 +60,108 @@
         }
       };
       
+      // 防抖函数
+      function debounce(fn, delay = 300) {
+        let timer = null;
+        return function(...args) {
+          if (timer) clearTimeout(timer);
+          timer = setTimeout(() => {
+            fn.apply(this, args);
+          }, delay);
+        };
+      }
+      
       // K线图组件
       const KLineChart = {
-        props: ['data', 'name'],
+        props: ['data', 'name', 'period'],
         template: '<div ref="chartRef" class="kline-chart"></div>',
-        setup(props) {
-          const chartRef = ref(null);
-          let chart = null;
-          
-          const initChart = () => {
-            if (!chartRef.value) return;
-            chart = echarts.init(chartRef.value);
-            updateChart();
+        data() {
+          return {
+            chart: null
           };
-          
-          const updateChart = () => {
-            if (!chart || !props.data.length) return;
+        },
+        mounted() {
+          this.initChart();
+          window.addEventListener('resize', () => {
+            if (this.chart) this.chart.resize();
+          });
+        },
+        watch: {
+          data: {
+            handler() {
+              this.updateChart();
+            },
+            deep: true
+          },
+          period() {
+            this.updateChart();
+          }
+        },
+        beforeUnmount() {
+          if (this.chart) {
+            this.chart.dispose();
+            this.chart = null;
+          }
+        },
+        methods: {
+          initChart() {
+            if (!this.$refs.chartRef) return;
+            this.chart = echarts.init(this.$refs.chartRef);
+            this.updateChart();
+          },
+          updateChart() {
+            if (!this.chart || !this.data || !this.data.length) return;
             
-            const dates = props.data.map(d => d.date);
-            const ohlc = props.data.map(d => [d.open, d.close, d.low, d.high]);
-            const volumes = props.data.map(d => d.volume);
+            const dates = this.data.map(d => d.date);
+            const ohlc = this.data.map(d => [d.open, d.close, d.low, d.high]);
+            const volumes = this.data.map(d => d.volume);
             
             const colors = { up: '#ef232a', down: '#14b143', border: '#000000' };
             
+            // 根据不同周期设置初始显示范围
+            let startPercent, endPercent;
+            const dataCount = this.data.length;
+            const period = this.period || 'daily';
+            
+            if (period === 'minute') {
+              // 分时数据显示最近的60%
+              startPercent = 40;
+              endPercent = 100;
+            } else if (period === 'monthly') {
+              // 月K显示最近24个月
+              startPercent = Math.max(0, Math.max(0, dataCount - 24) / dataCount * 100);
+              endPercent = 100;
+            } else if (period === 'weekly') {
+              // 周K显示最近40周
+              startPercent = Math.max(0, Math.max(0, dataCount - 40) / dataCount * 100);
+              endPercent = 100;
+            } else {
+              // 日K显示最近60个交易日
+              startPercent = Math.max(0, Math.max(0, dataCount - 60) / dataCount * 100);
+              endPercent = 100;
+            }
+            
             const option = {
-              tooltip: { trigger: 'axis', axisPointer: { type: 'cross' } },
+              tooltip: { 
+                trigger: 'axis', 
+                axisPointer: { type: 'cross' },
+                formatter: (params) => {
+                  if (!params || params.length === 0) return '';
+                  const klineData = params.find(p => p.seriesName === 'K线');
+                  if (!klineData) return '';
+                  const data = klineData.data;
+                  const date = klineData.axisValue;
+                  return `
+                    <div style="font-size:12px;">
+                      <div><strong>${date}</strong></div>
+                      <div>开盘: ${data[0]}</div>
+                      <div>收盘: ${data[1]}</div>
+                      <div>最低: ${data[2]}</div>
+                      <div>最高: ${data[3]}</div>
+                    </div>
+                  `;
+                }
+              },
               legend: { data: ['K线', '成交量'] },
               grid: [
                 { left: '10%', right: '10%', height: '60%' },
@@ -87,21 +175,18 @@
                 { scale: true, splitArea: { show: true } },
                 { scale: true, gridIndex: 1, splitNumber: 2, axisLabel: { show: false }, axisLine: { show: false }, axisTick: { show: false }, splitLine: { show: false } }
               ],
-              dataZoom: [{ type: 'inside', xAxisIndex: [0, 1], start: 50, end: 100 }],
+              dataZoom: [
+                { type: 'inside', xAxisIndex: [0, 1], start: startPercent, end: endPercent },
+                { type: 'slider', xAxisIndex: [0, 1], start: startPercent, end: endPercent, height: 20, bottom: 10 }
+              ],
               series: [
                 { name: 'K线', type: 'candlestick', data: ohlc, itemStyle: { color: colors.up, color0: colors.down, borderColor: colors.border, borderColor0: colors.border } },
                 { name: '成交量', type: 'bar', xAxisIndex: 1, yAxisIndex: 1, data: volumes, itemStyle: { color: (params) => { const kData = ohlc[params.dataIndex]; return kData && kData[1] >= kData[0] ? colors.up : colors.down; } } }
               ]
             };
             
-            chart.setOption(option);
-          };
-          
-          watch(() => props.data, updateChart, { deep: true });
-          
-          onMounted(() => { initChart(); window.addEventListener('resize', () => chart && chart.resize()); });
-          
-          return { chartRef };
+            this.chart.setOption(option);
+          }
         }
       };
       
@@ -131,66 +216,175 @@
               </div>
               <div class="chart-container">
                 <div class="chart-header">
-                  <h3>{{ selectedStock?.name || '请选择股票' }} - K线图</h3>
-                  <div class="export-btns" v-if="selectedStock">
-                    <button @click="exportData('csv')" class="export-btn">导出CSV</button>
-                    <button @click="exportData('json')" class="export-btn">导出JSON</button>
+                  <div class="chart-title">
+                    <h3>{{ selectedStock?.name || '请选择股票' }}</h3>
+                    <span v-if="currentPrice" :class="['current-price', priceChangeClass]">
+                      {{ currentPrice }} {{ priceChange }}
+                    </span>
+                  </div>
+                  <div style="display: flex; gap: 16px; align-items: center; flex-wrap: wrap;">
+                    <!-- 周期选择器 -->
+                    <div class="period-selector" v-if="selectedStock">
+                      <button 
+                        v-for="p in periods" 
+                        :key="p.value"
+                        :class="['period-btn', { active: currentPeriod === p.value }]"
+                        @click="changePeriod(p.value)"
+                      >
+                        {{ p.label }}
+                      </button>
+                    </div>
+                    <div class="export-btns" v-if="selectedStock">
+                      <button @click="exportData('csv')" class="export-btn">导出CSV</button>
+                      <button @click="exportData('json')" class="export-btn">导出JSON</button>
+                    </div>
                   </div>
                 </div>
                 <div v-if="loading" class="loading">加载中...</div>
                 <div v-else-if="klineData.length === 0" class="empty">{{ selectedStock ? '暂无数据' : '请选择股票' }}</div>
-                <KLineChart v-else :data="klineData" :name="selectedStock?.name" />
+                <KLineChart v-else :data="klineData" :name="selectedStock?.name" :period="currentPeriod" />
               </div>
             </main>
           </div>
         `,
-        setup() {
-          const keyword = ref('');
-          const stocks = ref([]);
-          const selectedStock = ref(null);
-          const klineData = ref([]);
-          const loading = ref(false);
-          
-          const fetchStockList = async () => {
+        data() {
+          return {
+            keyword: '',
+            allStocks: [],
+            filteredStocks: [],
+            selectedStock: null,
+            klineData: [],
+            loading: false,
+            // 周期相关
+            currentPeriod: 'daily',
+            periods: [
+              { label: '日K', value: 'daily' },
+              { label: '周K', value: 'weekly' },
+              { label: '月K', value: 'monthly' },
+              { label: '分时', value: 'minute' }
+            ],
+            // 实时价格
+            currentPrice: null,
+            priceChange: null,
+            debouncedSearch: null
+          };
+        },
+        computed: {
+          stocks() {
+            return this.filteredStocks.length > 0 ? this.filteredStocks : this.allStocks;
+          },
+          priceChangeClass() {
+            if (!this.priceChange) return '';
+            return this.priceChange.startsWith('+') ? 'price-up' : 'price-down';
+          }
+        },
+        mounted() {
+          this.fetchStockList();
+          this.debouncedSearch = debounce(this.doSearch, 300);
+        },
+        beforeUnmount() {
+          if (this.debouncedSearch) clearTimeout(this.debouncedSearch);
+        },
+        methods: {
+          // 获取全量股票列表
+          async fetchStockList() {
             try {
               const res = await axios.get('/api/stock/list');
-              stocks.value = res.data.data;
-            } catch (e) { console.error('获取股票列表失败:', e); }
-          };
+              this.allStocks = res.data.data || [];
+              this.filteredStocks = [];
+            } catch (e) { 
+              console.error('获取股票列表失败:', e); 
+              this.allStocks = [];
+            }
+          },
           
-          const handleSearch = async () => {
-            if (!keyword.value.trim()) { fetchStockList(); return; }
+          // 搜索输入处理（带防抖）
+          handleSearch() {
+            const kw = this.keyword.trim();
+            if (!kw) {
+              this.filteredStocks = [];
+              return;
+            }
+            this.debouncedSearch(kw);
+          },
+          
+          // 执行搜索
+          async doSearch(keyword) {
+            if (!keyword) return;
             try {
-              const res = await axios.get('/api/stock/search?keyword=' + keyword.value);
-              stocks.value = res.data.data;
-            } catch (e) { console.error('搜索失败:', e); }
-          };
+              const res = await axios.get('/api/stock/search?keyword=' + encodeURIComponent(keyword));
+              this.filteredStocks = res.data.data || [];
+            } catch (e) { 
+              console.error('搜索失败:', e);
+              this.localFilter(keyword);
+            }
+          },
           
-          const selectStock = async (stock) => {
-            selectedStock.value = stock;
-            loading.value = true;
-            klineData.value = [];
+          // 本地过滤（降级方案）
+          localFilter(keyword) {
+            const kw = keyword.toLowerCase();
+            this.filteredStocks = this.allStocks.filter(stock => 
+              stock.code.toLowerCase().includes(kw) || 
+              (stock.name && stock.name.toLowerCase().includes(kw))
+            );
+          },
+          
+          // 选择股票
+          async selectStock(stock) {
+            this.selectedStock = stock;
+            this.currentPeriod = 'daily'; // 切换股票时重置为日K
+            this.currentPrice = null;
+            this.priceChange = null;
+            await this.fetchKlineData();
+          },
+          
+          // 获取K线数据
+          async fetchKlineData() {
+            if (!this.selectedStock) return;
+            
+            this.loading = true;
+            this.klineData = [];
+            
             try {
-              const res = await axios.get('/api/stock/' + stock.code);
-              klineData.value = res.data.data;
-            } catch (e) { console.error('获取K线数据失败:', e); }
-            finally { loading.value = false; }
-          };
+              // 使用history接口，带上period参数
+              const res = await axios.get('/api/stock/' + this.selectedStock.code + '/history?period=' + this.currentPeriod);
+              this.klineData = res.data.data || [];
+              
+              // 更新当前价格显示
+              if (this.klineData.length > 0) {
+                const latest = this.klineData[this.klineData.length - 1];
+                this.currentPrice = latest.close;
+                // 计算涨跌幅
+                if (this.klineData.length > 1) {
+                  const prev = this.klineData[this.klineData.length - 2];
+                  const change = ((latest.close - prev.close) / prev.close * 100).toFixed(2);
+                  this.priceChange = (change >= 0 ? '+' : '') + change + '%';
+                }
+              }
+            } catch (e) { 
+              console.error('获取K线数据失败:', e); 
+            } finally { 
+              this.loading = false; 
+            }
+          },
           
-          const exportData = (format) => {
-            if (!selectedStock.value) return;
-            const url = '/api/stock/' + selectedStock.value.code + '/export?format=' + format;
+          // 切换周期
+          async changePeriod(period) {
+            if (this.currentPeriod === period) return;
+            this.currentPeriod = period;
+            await this.fetchKlineData();
+          },
+          
+          // 导出数据
+          exportData(format) {
+            if (!this.selectedStock) return;
+            const url = '/api/stock/' + this.selectedStock.code + '/history/export?period=' + this.currentPeriod + '&format=' + format;
             window.open(url, '_blank');
-          };
-          
-          onMounted(() => { fetchStockList(); });
-          
-          return { keyword, stocks, selectedStock, klineData, loading, handleSearch, selectStock, exportData };
+          }
         }
       };
       
       createApp(App).mount('#app');
     </script>
-    <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
   </body>
 </html>
