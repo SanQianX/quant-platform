@@ -170,11 +170,19 @@ class StockService:
 
             logger.info(f"搜索股票: {keyword}")
 
-            # 使用配置文件中的股票列表进行搜索
+            # 获取全量股票列表进行搜索
+            all_stocks = StockService.get_stock_list(use_tushare=True)
+            if all_stocks.get('code') != 0:
+                # 如果获取失败，使用本地列表
+                all_stocks = STOCK_LIST
+            else:
+                all_stocks = all_stocks.get('data', [])
+
+            # 搜索匹配
             keyword_lower = keyword.lower()
             result = [
-                stock for stock in STOCK_LIST
-                if keyword_lower in stock["code"].lower() or keyword_lower in stock["name"].lower()
+                stock for stock in all_stocks
+                if keyword_lower in str(stock.get("code", "")).lower() or keyword_lower in stock.get("name", "").lower()
             ]
 
             logger.info(f"搜索'{keyword}'找到{len(result)}条结果")
