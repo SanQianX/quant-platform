@@ -10,13 +10,16 @@ export default defineConfig({
       'Content-Type': 'text/html; charset=utf-8'
     },
     proxy: {
-      // API代理配置 - 在Docker容器内访问后端
+      // API代理配置
       '/api': {
-        // Docker环境: 使用服务名
-        // 开发环境(本地): 使用 localhost:8000
-        target: process.env.VITE_API_BASE_URL || 'http://localhost:8000',
+        // Docker容器内: 使用服务名 quant-backend 或 backend
+        // 本地开发(非Docker): 使用 localhost:8000
+        target: process.env.VITE_API_BASE_URL || 'http://backend:8000',
         changeOrigin: true,
-        secure: false
+        secure: false,
+        // 解决 WebSocket 和超时问题
+        ws: true,
+        timeout: 30000
       }
     }
   }

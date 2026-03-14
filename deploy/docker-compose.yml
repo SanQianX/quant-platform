@@ -13,7 +13,7 @@ services:
     ports:
       - "5432:5432"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - G:/quant-data/postgres:/var/lib/postgresql/data
     networks:
       - quant-network
     healthcheck:
@@ -96,6 +96,3 @@ services:
 networks:
   quant-network:
     driver: bridge
-
-volumes:
-  postgres_data:

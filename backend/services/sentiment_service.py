@@ -3,16 +3,16 @@
 舆情监控数据服务模块
 
 提供股票新闻、公告、研报等功能
+优先使用 AkShare 真实数据
+情绪/舆情模块不支持模拟数据降级，必须返回真实数据或明确报错
 """
 
 import akshare as ak
 import pandas as pd
 from datetime import datetime, timedelta
-from models.response import success_response, error_response
-from config import MOCK_DATA_CONFIG
+from models.response import success_response, error_response, not_found_error
 from utils.logger import logger
 from utils.cache import cache
-import random
 
 
 class SentimentService:
@@ -31,75 +31,6 @@ class SentimentService:
             return False, "股票代码格式错误，应为6位数字"
         
         return True, ""
-    
-    @staticmethod
-    def get_mock_news_data(stock_code: str) -> list:
-        """获取模拟新闻数据"""
-        news_list = []
-        titles = [
-            f"{stock_code}发布最新财报，营收同比增长",
-            f"券商上调{stock_code}目标价",
-            f"{stock_code}获得重大合同订单",
-            f"机构扎堆调研{stock_code}",
-            f"{stock_code}布局新能源领域"
-        ]
-        
-        for i, title in enumerate(titles):
-            news_list.append({
-                "title": title + f" {random.randint(10, 50)}%",
-                "pub_date": (datetime.now() - timedelta(days=i)).strftime("%Y-%m-%d %H:%M:%S"),
-                "source": random.choice(["新浪财经", "东方财富", "证券日报", "第一财经"]),
-                "url": f"https://example.com/news/{stock_code}/{i}"
-            })
-        
-        return news_list
-    
-    @staticmethod
-    def get_mock_announcement_data(stock_code: str) -> list:
-        """获取模拟公告数据"""
-        announcements = []
-        titles = [
-            f"关于{stock_code}2024年度股东大会决议公告",
-            f"{stock_code}2024年年度报告摘要",
-            f"关于{stock_code}重大资产重组进展公告",
-            f"{stock_code}关于股票异常波动的澄清公告",
-            f"{stock_code}2024年度利润分配方案"
-        ]
-        
-        for i, title in enumerate(titles):
-            announcements.append({
-                "title": title,
-                "pub_date": (datetime.now() - timedelta(days=i*2)).strftime("%Y-%m-%d"),
-                "announcement_type": random.choice(["定期报告", "临时公告", "业绩预告", "风险提示"]),
-                "url": f"https://example.com/announcement/{stock_code}/{i}"
-            })
-        
-        return announcements
-    
-    @staticmethod
-    def get_mock_research_data(stock_code: str) -> list:
-        """获取模拟研报数据"""
-        research_list = []
-        institutes = ["中金公司", "华泰证券", "国泰君安", "中信证券", "银河证券", "申万宏源"]
-        titles = [
-            "首次覆盖，给予买入评级",
-            "年报点评：业绩超预期",
-            "深度报告：龙头地位稳固",
-            "季报点评：增长动能强劲",
-            "行业专题：景气度上行"
-        ]
-        
-        for i, title in enumerate(titles):
-            research_list.append({
-                "title": f"{stock_code}：{title}",
-                "pub_date": (datetime.now() - timedelta(days=i*3)).strftime("%Y-%m-%d"),
-                "institute": random.choice(institutes),
-                "author": random.choice(["分析师A", "分析师B", "首席分析师"]),
-                "rating": random.choice(["买入", "增持", "中性", "推荐"]),
-                "url": f"https://example.com/research/{stock_code}/{i}"
-            })
-        
-        return research_list
     
     @staticmethod
     def get_stock_news(stock_code: str):
@@ -131,11 +62,11 @@ class SentimentService:
             df = ak.stock_news_em(symbol=stock_code)
             
             if df is None or df.empty:
-                if MOCK_DATA_CONFIG["enabled"]:
-                    mock_data = SentimentService.get_mock_news_data(stock_code)
-                    cache.set(cache_key, mock_data, ttl=300)
-                    return success_response(mock_data)
-                return error_response("暂无新闻数据")
+                # 情绪模块：无数据就是无数据，不使用模拟数据降级
+                return not_found_error(
+                    message="暂无新闻数据",
+                    detail=f"股票 {stock_code} 今日暂无新闻发布"
+                )
             
             # 转换数据格式
             news_list = []
@@ -151,11 +82,11 @@ class SentimentService:
                     news_list.append(news_item)
             
             if not news_list:
-                if MOCK_DATA_CONFIG["enabled"]:
-                    mock_data = SentimentService.get_mock_news_data(stock_code)
-                    cache.set(cache_key, mock_data, ttl=300)
-                    return success_response(mock_data)
-                return error_response("暂无新闻数据")
+                # 情绪模块：无数据就是无数据
+                return not_found_error(
+                    message="暂无新闻数据",
+                    detail=f"股票 {stock_code} 今日暂无新闻发布"
+                )
             
             # 存入缓存
             cache.set(cache_key, news_list, ttl=300)
@@ -165,11 +96,12 @@ class SentimentService:
             
         except Exception as e:
             logger.error(f"获取股票新闻失败: {e}")
-            if MOCK_DATA_CONFIG["enabled"]:
-                mock_data = SentimentService.get_mock_news_data(stock_code)
-                cache.set(cache_key, mock_data, ttl=60)
-                return success_response(mock_data)
-            return error_response(f"获取股票新闻失败: {str(e)}")
+            # 情绪模块：即使出错也不使用模拟数据，返回明确错误
+            return {
+                "code": 1,
+                "message": "情绪数据获取失败",
+                "error": "data_fetch_failed"
+            }
     
     @staticmethod
     def get_stock_announcements(stock_code: str, date: str = None):
@@ -206,11 +138,11 @@ class SentimentService:
             df = ak.stock_notice_report(symbol=stock_code, date=date)
             
             if df is None or df.empty:
-                if MOCK_DATA_CONFIG["enabled"]:
-                    mock_data = SentimentService.get_mock_announcement_data(stock_code)
-                    cache.set(cache_key, mock_data, ttl=300)
-                    return success_response(mock_data)
-                return error_response("暂无公告数据")
+                # 情绪模块：无数据就是无数据，不使用模拟数据降级
+                return not_found_error(
+                    message="暂无公告数据",
+                    detail=f"股票 {stock_code} 在 {date} 暂无公告发布"
+                )
             
             # 转换数据格式
             announcements = []
@@ -233,11 +165,11 @@ class SentimentService:
                     announcements.append(announcement)
             
             if not announcements:
-                if MOCK_DATA_CONFIG["enabled"]:
-                    mock_data = SentimentService.get_mock_announcement_data(stock_code)
-                    cache.set(cache_key, mock_data, ttl=300)
-                    return success_response(mock_data)
-                return error_response("暂无公告数据")
+                # 情绪模块：无数据就是无数据
+                return not_found_error(
+                    message="暂无公告数据",
+                    detail=f"股票 {stock_code} 在 {date} 暂无公告发布"
+                )
             
             # 存入缓存
             cache.set(cache_key, announcements, ttl=300)
@@ -247,11 +179,12 @@ class SentimentService:
             
         except Exception as e:
             logger.error(f"获取股票公告失败: {e}")
-            if MOCK_DATA_CONFIG["enabled"]:
-                mock_data = SentimentService.get_mock_announcement_data(stock_code)
-                cache.set(cache_key, mock_data, ttl=60)
-                return success_response(mock_data)
-            return error_response(f"获取股票公告失败: {str(e)}")
+            # 情绪模块：即使出错也不使用模拟数据，返回明确错误
+            return {
+                "code": 1,
+                "message": "情绪数据获取失败",
+                "error": "data_fetch_failed"
+            }
     
     @staticmethod
     def get_stock_research(stock_code: str):
@@ -283,11 +216,11 @@ class SentimentService:
             df = ak.stock_research_report_em(symbol=stock_code)
             
             if df is None or df.empty:
-                if MOCK_DATA_CONFIG["enabled"]:
-                    mock_data = SentimentService.get_mock_research_data(stock_code)
-                    cache.set(cache_key, mock_data, ttl=300)
-                    return success_response(mock_data)
-                return error_response("暂无研报数据")
+                # 情绪模块：无数据就是无数据，不使用模拟数据降级
+                return not_found_error(
+                    message="暂无研报数据",
+                    detail=f"股票 {stock_code} 暂无研报发布"
+                )
             
             # 转换数据格式
             research_list = []
@@ -314,11 +247,11 @@ class SentimentService:
                     research_list.append(research)
             
             if not research_list:
-                if MOCK_DATA_CONFIG["enabled"]:
-                    mock_data = SentimentService.get_mock_research_data(stock_code)
-                    cache.set(cache_key, mock_data, ttl=300)
-                    return success_response(mock_data)
-                return error_response("暂无研报数据")
+                # 情绪模块：无数据就是无数据
+                return not_found_error(
+                    message="暂无研报数据",
+                    detail=f"股票 {stock_code} 暂无研报发布"
+                )
             
             # 存入缓存
             cache.set(cache_key, research_list, ttl=3600)
@@ -328,8 +261,9 @@ class SentimentService:
             
         except Exception as e:
             logger.error(f"获取券商研报失败: {e}")
-            if MOCK_DATA_CONFIG["enabled"]:
-                mock_data = SentimentService.get_mock_research_data(stock_code)
-                cache.set(cache_key, mock_data, ttl=60)
-                return success_response(mock_data)
-            return error_response(f"获取券商研报失败: {str(e)}")
+            # 情绪模块：即使出错也不使用模拟数据，返回明确错误
+            return {
+                "code": 1,
+                "message": "情绪数据获取失败",
+                "error": "data_fetch_failed"
+            }

@@ -170,20 +170,26 @@ class StockService:
 
             logger.info(f"搜索股票: {keyword}")
 
-            # 获取全量股票列表进行搜索
-            all_stocks = StockService.get_stock_list(use_tushare=True)
-            if all_stocks.get('code') != 0:
-                # 如果获取失败，使用本地列表
-                all_stocks = STOCK_LIST
-            else:
-                all_stocks = all_stocks.get('data', [])
-
-            # 搜索匹配
-            keyword_lower = keyword.lower()
+            # 直接从数据库搜索
+            db = SessionLocal()
+            keyword_lower = keyword.strip().lower()
+            
+            # 使用模糊匹配搜索股票代码和名称
+            stocks = db.query(Stock).filter(
+                (Stock.code.like(f'%{keyword_lower}%')) | 
+                (Stock.name.like(f'%{keyword}%'))
+            ).all()
+            
             result = [
-                stock for stock in all_stocks
-                if keyword_lower in str(stock.get("code", "")).lower() or keyword_lower in stock.get("name", "").lower()
+                {
+                    "code": s.code,
+                    "name": s.name,
+                    "market": s.market,
+                    "stock_type": s.stock_type
+                }
+                for s in stocks
             ]
+            db.close()
 
             logger.info(f"搜索'{keyword}'找到{len(result)}条结果")
             return success_response(result)
@@ -192,36 +198,93 @@ class StockService:
             return error_response(f"搜索失败: {str(e)}")
     
     @staticmethod
-    def fetch_kline_from_akshare(stock_code: str, market: str = "sh") -> pd.DataFrame:
+    def fetch_kline_from_akshare(stock_code: str, market: str = "sh", period: str = "daily",
+                                  start_date: str = None, end_date: str = None) -> pd.DataFrame:
         """
         从AkShare获取K线数据
-        
+
         Args:
             stock_code: 股票代码
             market: 市场类型 (sh/sz)
-            
+            period: 周期 (daily/weekly/monthly/1min/5min/15min/30min/60min)
+            start_date: 开始日期 (YYYYMMDD)
+            end_date: 结束日期 (YYYYMMDD)
+
         Returns:
             DataFrame: K线数据
         """
         try:
-            # 确定股票代码符号
-            if market == "sh" and stock_code.startswith("000"):
-                symbol = "sh000001"
-            elif market == "sz" and stock_code.startswith("399"):
-                symbol = f"sz{stock_code}"
-            else:
+            # 分钟级别数据使用专门的接口
+            if period in ["1min", "5min", "15min", "30min", "60min"]:
+                # 确定股票代码符号 (上证: shxxxxxx, 深证: szxxxxxx)
                 symbol = f"{market}{stock_code}"
-            
-            # 获取日K线数据
-            df = ak.stock_zh_a_hist(
-                symbol=symbol, 
-                period="daily", 
-                start_date=AKSHARE_CONFIG["start_date"], 
-                end_date=datetime.now().strftime("%Y%m%d"), 
-                adjust=AKSHARE_CONFIG["adjust"]
-            )
-            
-            return df
+
+                # 转换周期格式 (1min -> 1)
+                minute_type = period.replace("min", "")
+
+                # 获取分钟数据
+                df = ak.stock_zh_a_minute(
+                    symbol=symbol,
+                    period=minute_type,
+                    adjust=""
+                )
+
+                if df is None or df.empty:
+                    return pd.DataFrame()
+
+                # 统一字段名
+                df = df.rename(columns={
+                    'day': 'date',
+                    'vol': 'volume'
+                })
+
+                # 过滤日期范围 - 日期格式为 "YYYY-MM-DD HH:MM:SS"
+                if start_date:
+                    # 转换为 "YYYY-MM-DD" 格式进行比较
+                    start_str = start_date[:4] + '-' + start_date[4:6] + '-' + start_date[6:8]
+                    # 只取日期部分进行比较
+                    df['date_only'] = df['date'].str[:10]
+                    df = df[df['date_only'] >= start_str]
+                    df = df.drop('date_only', axis=1)
+                if end_date:
+                    end_str = end_date[:4] + '-' + end_date[4:6] + '-' + end_date[6:8]
+                    df['date_only'] = df['date'].str[:10]
+                    df = df[df['date_only'] <= end_str]
+                    df = df.drop('date_only', axis=1)
+
+                return df
+
+            # 日周月级别数据使用原有接口
+            else:
+                # 确定股票代码符号
+                if market == "sh" and stock_code.startswith("000"):
+                    symbol = "sh000001"
+                elif market == "sz" and stock_code.startswith("399"):
+                    symbol = f"sz{stock_code}"
+                else:
+                    symbol = f"{market}{stock_code}"
+
+                # 处理日期格式
+                if start_date:
+                    s_date = start_date if len(start_date) == 8 else datetime.now().strftime("%Y%m%d")
+                else:
+                    s_date = (datetime.now() - timedelta(days=30)).strftime("%Y%m%d")
+
+                if end_date:
+                    e_date = end_date if len(end_date) == 8 else datetime.now().strftime("%Y%m%d")
+                else:
+                    e_date = datetime.now().strftime("%Y%m%d")
+
+                # 获取K线数据
+                df = ak.stock_zh_a_hist(
+                    symbol=symbol,
+                    period=period,
+                    start_date=s_date,
+                    end_date=e_date,
+                    adjust=""
+                )
+
+                return df
         except Exception as e:
             print(f"从AkShare获取K线数据失败: {e}")
             return pd.DataFrame()
@@ -297,7 +360,7 @@ class StockService:
             # 1. 先从数据库查询
             klines = db.query(KLine).filter(
                 KLine.stock_code == stock_code
-            ).order_by(KLine.date).all()
+            ).order_by(KLine.trade_date).all()
             
             if klines:
                 result = [
@@ -492,31 +555,43 @@ class StockService:
                 market = stock.market
             
             logger.info(f"获取K线数据: {stock_code} 周期: {period} 市场: {market}")
-            
+
             df = pd.DataFrame()
-            
-            # 优先使用Tushare
-            if TUSHARE_TOKEN:
-                df = StockService.fetch_kline_from_tushare(
-                    stock_code, market,
-                    start_date.replace("-", ""),
-                    end_date.replace("-", ""), period)
-            
-            # 如果Tushare失败，尝试AkShare（仅支持日周月）
-            if (df is None or df.empty) and period in ["daily", "weekly", "monthly"]:
+
+            # 根据周期选择数据源
+            # 1. 分钟级别数据使用 AkShare (Tushare minute接口需要高权限)
+            if period in ["1min", "5min", "15min", "30min", "60min"]:
                 try:
-                    s_ak = start_date.replace("-", "")
-                    e_ak = end_date.replace("-", "")
-                    symbol = f"{market}{stock_code}"
-                    df = ak.stock_zh_a_hist(
-                        symbol=symbol, 
-                        period=period, 
-                        start_date=s_ak, 
-                        end_date=e_ak, 
-                        adjust="qfq"
+                    df = StockService.fetch_kline_from_akshare(
+                        stock_code, market, period,
+                        start_date.replace("-", ""),
+                        end_date.replace("-", "")
                     )
                 except Exception as e:
-                    logger.warning(f"从AkShare获取数据失败: {e}")
+                    logger.warning(f"从AkShare获取分钟数据失败: {e}")
+            # 2. 日周月数据优先使用Tushare，失败则使用AkShare
+            else:
+                if TUSHARE_TOKEN:
+                    df = StockService.fetch_kline_from_tushare(
+                        stock_code, market,
+                        start_date.replace("-", ""),
+                        end_date.replace("-", ""), period)
+
+                # 如果Tushare失败，尝试AkShare（仅支持日周月）
+                if (df is None or df.empty):
+                    try:
+                        s_ak = start_date.replace("-", "")
+                        e_ak = end_date.replace("-", "")
+                        symbol = f"{market}{stock_code}"
+                        df = ak.stock_zh_a_hist(
+                            symbol=symbol,
+                            period=period,
+                            start_date=s_ak,
+                            end_date=e_ak,
+                            adjust=""
+                        )
+                    except Exception as e:
+                        logger.warning(f"从AkShare获取数据失败: {e}")
             
             # 如果仍然没有数据，使用模拟数据
             if df is None or df.empty:
