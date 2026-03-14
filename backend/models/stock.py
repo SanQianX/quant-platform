@@ -43,16 +43,16 @@ class KLine(Base):
         close: 收盘价
         volume: 成交量
     """
-    __tablename__ = "klines"
+    __tablename__ = "kline_daily"
 
     id = Column(Integer, primary_key=True, index=True)
     stock_code = Column(String(10), index=True)
-    date = Column(Date, index=True)
+    date = Column("trade_date", Date, index=True)
     open = Column(Float, comment="开盘价")
     high = Column(Float, comment="最高价")
     low = Column(Float, comment="最低价")
     close = Column(Float, comment="收盘价")
-    volume = Column(Float, comment="成交量")
+    volume = Column("vol", Float, comment="成交量")
 
     def __repr__(self):
         return f"<KLine(code={self.stock_code}, date={self.date})>"

@@ -40,7 +40,7 @@ services:
       - DB_USER=quant_user
       - DB_PASSWORD=quant_pass
       - DB_NAME=quant_platform
-      - ENV=development
+      - ENV=production
     depends_on:
       postgres:
         condition: service_healthy

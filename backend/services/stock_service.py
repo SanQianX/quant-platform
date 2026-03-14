@@ -360,7 +360,7 @@ class StockService:
             # 1. 先从数据库查询
             klines = db.query(KLine).filter(
                 KLine.stock_code == stock_code
-            ).order_by(KLine.trade_date).all()
+            ).order_by(KLine.date).all()
             
             if klines:
                 result = [
@@ -546,6 +546,31 @@ class StockService:
         
         db = SessionLocal()
         try:
+            # 1. 先从数据库查询（日K数据）
+            if period == "daily":
+                db_klines = db.query(KLine).filter(
+                    KLine.stock_code == stock_code
+                ).order_by(KLine.date.desc()).limit(500).all()
+                
+                if db_klines:
+                    logger.info(f"从数据库读取K线数据: {stock_code}，共{len(db_klines)}条")
+                    # 转换为列表并按日期升序排列（最旧的在前面）
+                    kline_data = [
+                        {
+                            "date": k.date.strftime("%Y-%m-%d"),
+                            "open": k.open,
+                            "high": k.high,
+                            "low": k.low,
+                            "close": k.close,
+                            "volume": k.volume
+                        }
+                        for k in db_klines
+                    ]
+                    # 反转为升序（最旧的在前面，最新的在后面）
+                    kline_data.reverse()
+                    cache.set(cache_key, kline_data, ttl=300)
+                    return success_response(kline_data)
+            
             # 查询股票信息
             stock = db.query(Stock).filter(Stock.code == stock_code).first()
             if not stock:
